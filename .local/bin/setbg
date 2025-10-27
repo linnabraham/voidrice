@@ -14,8 +14,9 @@ dunstconf="${XDG_CONFIG_HOME:-$HOME/.config}/dunst/dunstrc"
 zathuraconf="${XDG_CONFIG_HOME:-$HOME/.config}/zathura/zathurarc"
 
 # Give -s as parameter to make notifications silent.
-while getopts "s" o; do case "${o}" in
+while getopts "sl" o; do case "${o}" in
 	s) silent='1' ;;
+	l) latest='1' ;;
 esac done
 
 shift $((OPTIND - 1))
@@ -23,7 +24,13 @@ shift $((OPTIND - 1))
 trueloc="$(readlink -f "$1")" &&
 case "$(file --mime-type -b "$trueloc")" in
 	image/* ) ln -sf "$trueloc" "$bgloc" && [ -z "$silent" ] && notify-send -i "$bgloc" "Changing wallpaper..." ;;
-	inode/directory ) ln -sf "$(find "$trueloc" -iregex '.*.\(jpg\|jpeg\|png\|gif\)' -type f | shuf -n 1)" "$bgloc" && [ -z "$silent" ] && notify-send -i "$bgloc" "Random Wallpaper chosen." ;;
+	inode/directory ) 
+		if [ "$latest" ]; then
+			ln -sf "$(find "$trueloc" -iregex '.*\(jpg\|jpeg\|png\|gif\)' -type f -printf '%T@ %p\n' | sort -n | awk '{print $2}' | tail -n 1)" "$bgloc" && [ -z "$silent" ] && notify-send -i "$bgloc" "Latest Wallpaper chosen."
+		else
+			ln -sf "$(find "$trueloc" -iregex '.*.\(jpg\|jpeg\|png\|gif\)' -type f | shuf -n 1)" "$bgloc" && [ -z "$silent" ] && notify-send -i "$bgloc" "Random Wallpaper chosen."
+		fi
+		;;
 	*) [ -z "$silent" ] && notify-send "🖼️ Error" "Not a valid image or directory." ; exit 1;;
 esac
 
@@ -36,6 +43,6 @@ else
 	[ -f "$zathuraconf.bak" ] && unlink "$zathuraconf" && mv "$zathuraconf.bak" "$zathuraconf"
 fi
 
-xwallpaper --zoom "$bgloc"
+swaybg -i "$bgloc" 2>&1 &
 # If running, dwm hit the key to refresh the color scheme.
 pidof dwm >/dev/null && xdotool key super+F5
